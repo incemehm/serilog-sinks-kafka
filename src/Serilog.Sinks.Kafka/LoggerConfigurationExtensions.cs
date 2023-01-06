@@ -30,7 +30,8 @@ namespace Serilog.Sinks.Kafka
             string saslUsername = null,
             string saslPassword = null,
             string sslCaLocation = null,
-            Action<IProducer<Null, byte[]>, Error> errorHandler = null,
+            string messageKey = null,
+            Action<IProducer<string, byte[]>, Error> errorHandler = null,
             ITextFormatter formatter = null)
         {
             return loggerConfiguration.Kafka(
@@ -44,6 +45,7 @@ namespace Serilog.Sinks.Kafka
                 sslCaLocation,
                 topic,
                 topicDecider: null,
+                messageKey,
                 errorHandler,
                 formatter);
         }
@@ -69,7 +71,8 @@ namespace Serilog.Sinks.Kafka
             string saslUsername = null,
             string saslPassword = null,
             string sslCaLocation = null,
-            Action<IProducer<Null, byte[]>, Error> errorHandler = null,
+            string messageKey = null,
+            Action<IProducer<string, byte[]>, Error> errorHandler = null,
             ITextFormatter formatter = null)
         {
             return loggerConfiguration.Kafka(
@@ -83,6 +86,7 @@ namespace Serilog.Sinks.Kafka
                 sslCaLocation,
                 topic: null,
                 topicDecider,
+                messageKey,
                 errorHandler,
                 formatter);
         }
@@ -94,10 +98,11 @@ namespace Serilog.Sinks.Kafka
             ProducerConfig producerConfig,
             int batchSizeLimit = 50,
             int period = 5,
-            Action<IProducer<Null, byte[]>, Error> errorHandler = null,
+            string messageKey = null,
+            Action<IProducer<string, byte[]>, Error> errorHandler = null,
             ITextFormatter formatter = null)
         {
-            return loggerConfiguration.Kafka(producerConfig, topic, batchSizeLimit, period, topicDecider, errorHandler, formatter);
+            return loggerConfiguration.Kafka(producerConfig, topic, batchSizeLimit, period, topicDecider, messageKey, errorHandler, formatter);
         }
 
         private static LoggerConfiguration Kafka(
@@ -112,7 +117,8 @@ namespace Serilog.Sinks.Kafka
             string sslCaLocation,
             string topic,
             Func<LogEvent, string> topicDecider,
-            Action<IProducer<Null, byte[]>, Error> errorHandler,
+            string messageKey,
+            Action<IProducer<string, byte[]>, Error> errorHandler,
             ITextFormatter formatter)
         {
             return loggerConfiguration.Kafka(new ProducerConfig()
@@ -123,7 +129,7 @@ namespace Serilog.Sinks.Kafka
                 SaslUsername = saslUsername,
                 SaslPassword = saslPassword,
                 SslCaLocation = sslCaLocation
-            }, topic, batchSizeLimit, period, topicDecider, errorHandler, formatter);
+            }, topic, batchSizeLimit, period, topicDecider, messageKey, errorHandler, formatter);
         }
 
         private static LoggerConfiguration Kafka(
@@ -133,14 +139,15 @@ namespace Serilog.Sinks.Kafka
            int batchSizeLimit,
            int period,
            Func<LogEvent, string> topicDecider,
-           Action<IProducer<Null, byte[]>, Error> errorHandler,
+           string messageKey,
+           Action<IProducer<string, byte[]>, Error> errorHandler,
            ITextFormatter formatter)
         {
             var kafkaSink = new KafkaSink(
                 producerConfig,
                 topic,
                 topicDecider,
-                formatter, errorHandler);
+                formatter, messageKey, errorHandler);
 
             var batchingOptions = new PeriodicBatchingSinkOptions
             {

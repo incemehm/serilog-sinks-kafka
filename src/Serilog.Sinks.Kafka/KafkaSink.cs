@@ -21,16 +21,16 @@ namespace Serilog.Sinks.Kafka
         private readonly TopicPartition _globalTopicPartition;
         private readonly ITextFormatter _formatter;
         private readonly Func<LogEvent, string> _topicDecider;
-        Action<IProducer<Null, byte[]>, Error> _errorHandler;
+        Action<IProducer<string, byte[]>, Error> _errorHandler;
         ProducerConfig _producerConfig;
-
+        string messageKey;
         const string SKIP_KEY = "skip-kafka";
 
         public KafkaSink(
             ProducerConfig producerConfig,
             string topic = null,
             Func<LogEvent, string> topicDecider = null,
-             ITextFormatter formatter = null, Action<IProducer<Null, byte[]>, Error> errorHandler = null)
+             ITextFormatter formatter = null, string messageKey = null, Action<IProducer<string, byte[]>, Error> errorHandler = null)
         {
             _formatter = formatter ?? new Formatting.Json.JsonFormatter(renderMessage: true);
 
@@ -50,6 +50,7 @@ namespace Serilog.Sinks.Kafka
                 };
             }
 
+            this.messageKey = messageKey;
             this._producerConfig = producerConfig;
             ConfigureKafkaConnection();
         }
@@ -67,7 +68,7 @@ namespace Serilog.Sinks.Kafka
                     if (logEvent.Properties.ContainsKey(SKIP_KEY))
                         continue;
 
-                    Message<Null, byte[]> message;
+                    Message<string, byte[]> message;
 
                     var topicPartition = _topicDecider == null
                         ? _globalTopicPartition
@@ -77,8 +78,13 @@ namespace Serilog.Sinks.Kafka
                     {
                         _formatter.Format(logEvent, render);
 
-                        message = new Message<Null, byte[]>
+                        string key = null;
+                        if (!string.IsNullOrEmpty(messageKey) && logEvent.Properties.TryGetValue(messageKey, out LogEventPropertyValue value))
+                            key = value.ToString();
+
+                        message = new Message<string, byte[]>
                         {
+                            Key = key,
                             Value = Encoding.UTF8.GetBytes(render.ToString())
                         };
                     }
@@ -97,9 +103,9 @@ namespace Serilog.Sinks.Kafka
             return Task.CompletedTask;
         }
 
-        private IProducer<Null, byte[]> ConfigureKafkaConnection()
+        private IProducer<string, byte[]> ConfigureKafkaConnection()
         {
-            return new ProducerBuilder<Null, byte[]>(_producerConfig)
+            return new ProducerBuilder<string, byte[]>(_producerConfig)
                     .SetErrorHandler(_errorHandler)
                     .SetLogHandler((pro, msg) =>
                     {
