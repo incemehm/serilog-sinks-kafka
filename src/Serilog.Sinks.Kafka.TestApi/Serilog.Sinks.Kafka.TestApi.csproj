@@ -2,7 +2,6 @@
 
   <PropertyGroup>
     <TargetFramework>net6.0</TargetFramework>
-    <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
   </PropertyGroup>
 
   <ItemGroup>
@@ -13,7 +12,9 @@
     <PackageReference Include="Serilog.Filters.Expressions" Version="2.1.0" />
     <PackageReference Include="Serilog.Settings.Configuration" Version="8.0.4" />
   </ItemGroup>
-
+	<ItemGroup>
+		<PackageReference Include="Swashbuckle.AspNetCore" Version="6.4.0" />
+	</ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Serilog.Sinks.Kafka\Serilog.Sinks.Kafka.csproj" />
   </ItemGroup>

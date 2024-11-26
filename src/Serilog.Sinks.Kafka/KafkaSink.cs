@@ -86,20 +86,18 @@ namespace Serilog.Sinks.Kafka
                         if (!string.IsNullOrEmpty(messageKey) && logEvent.Properties.TryGetValue(messageKey, out LogEventPropertyValue value))
                             key = value.ToString();
 
+                        var log = Encoding.UTF8.GetBytes(render.ToString());
                         message = new Message<string, byte[]>
                         {
                             Key = key,
-                            Value = Encoding.UTF8.GetBytes(render.ToString())
+                            Value = log
                         };
                     }
 
-                    producer.Produce(topicPartition, message, report => {
-                        Log.ForContext(SKIP_KEY, string.Empty).Debug($"[Kafka]：{report.Error.Reason} {report.Status}");
-                    });
+                    producer.Produce(topicPartition, message);
                 }
 
                 var count = producer.Flush(TimeSpan.FromSeconds(FlushTimeoutSecs));
-                Log.ForContext(SKIP_KEY, string.Empty).Debug($"[Kafka]: Flush {count}");
             }
             catch (Exception ex)
             {
