@@ -32,6 +32,8 @@ namespace Serilog.Sinks.Kafka
             Func<LogEvent, string> topicDecider = null,
              ITextFormatter formatter = null, string messageKey = null, Action<IProducer<string, byte[]>, Error> errorHandler = null)
         {
+            Console.WriteLine($"[Kafka] new topic={topic}");
+
             _formatter = formatter ?? new Formatting.Json.JsonFormatter(renderMessage: true);
 
             if (topic != null)
@@ -46,13 +48,15 @@ namespace Serilog.Sinks.Kafka
             {
                 _errorHandler = (pro, msg) =>
                 {
-                    Log.ForContext(SKIP_KEY, string.Empty).Error($"[KafkaError] {pro.Name} {msg.Code} {msg.Reason}");
+                    Log.ForContext(SKIP_KEY, string.Empty).Error($"[Kafka] Error {pro.Name} {msg.Code} {msg.Reason}");
                 };
             }
 
             this.messageKey = messageKey;
             this._producerConfig = producerConfig;
             ConfigureKafkaConnection();
+
+            Console.WriteLine($"[Kafka] Producer OK");
         }
 
         public Task OnEmptyBatchAsync() => Task.CompletedTask;
@@ -89,14 +93,17 @@ namespace Serilog.Sinks.Kafka
                         };
                     }
 
-                    producer.Produce(topicPartition, message);
+                    producer.Produce(topicPartition, message, report => {
+                        Log.ForContext(SKIP_KEY, string.Empty).Debug($"[Kafka]：{report.Error.Reason} {report.Status}");
+                    });
                 }
 
-                producer.Flush(TimeSpan.FromSeconds(FlushTimeoutSecs));
+                var count = producer.Flush(TimeSpan.FromSeconds(FlushTimeoutSecs));
+                Log.ForContext(SKIP_KEY, string.Empty).Debug($"[Kafka]: Flush {count}");
             }
             catch (Exception ex)
             {
-                Log.ForContext(SKIP_KEY, string.Empty).Error(ex, "[EmitBatchAsync Error]");
+                Log.ForContext(SKIP_KEY, string.Empty).Error(ex, "[Kafka][EmitBatchAsync Error]");
                 Log.ForContext(SKIP_KEY, string.Empty).Information($"[Kafka][batchInfo] {batch.First().RenderMessage()} ~ {batch.Last().RenderMessage()}");
             }
 

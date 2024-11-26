@@ -10,14 +10,14 @@ namespace Serilog.Sinks.Kafka.TestApp
     {
         static void Main(string[] args)
         {
-            Environment.SetEnvironmentVariable("SERILOG__KAFKA__BOOTSTRAP_SERVERS", "localhost:9092");
+            //Environment.SetEnvironmentVariable("SERILOG__KAFKA__BOOTSTRAP_SERVERS", "localhost:9092");
 
-            Environment.SetEnvironmentVariable("SERILOG__KAFKA__SocketKeepaliveEnable", "true");
-            Environment.SetEnvironmentVariable("SERILOG__KAFKA__MetadataMaxAgeMs", "180000");
-            Environment.SetEnvironmentVariable("SERILOG__KAFKA__RequestTimeoutMs", "30000");
-            Environment.SetEnvironmentVariable("SERILOG__KAFKA__Partitioner", "ConsistentRandom");
-            Environment.SetEnvironmentVariable("SERILOG__KAFKA__EnableIdempotence", "false");
-            Environment.SetEnvironmentVariable("SERILOG__KAFKA__CompressionType", "None");
+            //Environment.SetEnvironmentVariable("SERILOG__KAFKA__SocketKeepaliveEnable", "true");
+            //Environment.SetEnvironmentVariable("SERILOG__KAFKA__MetadataMaxAgeMs", "180000");
+            //Environment.SetEnvironmentVariable("SERILOG__KAFKA__RequestTimeoutMs", "30000");
+            //Environment.SetEnvironmentVariable("SERILOG__KAFKA__Partitioner", "ConsistentRandom");
+            //Environment.SetEnvironmentVariable("SERILOG__KAFKA__EnableIdempotence", "false");
+            //Environment.SetEnvironmentVariable("SERILOG__KAFKA__CompressionType", "None");
 
             Debugging.SelfLog.Enable(msg =>
            {
@@ -31,6 +31,7 @@ namespace Serilog.Sinks.Kafka.TestApp
                 .Build();
 
             Log.Logger = new LoggerConfiguration()
+                .WriteTo.Console()
                 .ReadFrom.Configuration(config)
                 .CreateLogger();
 
