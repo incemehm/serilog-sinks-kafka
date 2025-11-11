@@ -21,13 +21,20 @@ Log.Logger = new LoggerConfiguration()
 ```
 
 ### Parameters
-* **bootstrapServers** - Comma separated list of Kafka Bootstrap Servers. Defaults to "localhost:9092"
 * **batchSizeLimit** - Maximum number of logs to batch. Defaults to 50
 * **period** - The period in seconds to send batches of logs. Defaults to 5 seconds
-* **securityProtocol** -  SecurityProtocol.Plaintext
-* **saslMechanism** - The SASL Mecahnism. Defaults to SaslMechanism.Plain
+* **bootstrapServers** - Comma separated list of Kafka Bootstrap Servers. Defaults to "localhost:9092"
 * **topic** - Name of the Kafka topic. Defaults to "logs"
-* **topicDecider** - Alternative to a static/constant "topic" value.  Function that can be used to determine the topic to be written to at runtime (example below)
+* **enableDeliveryReports** - (Optional) EnableDeliveryReports setting for Producer, defaults to false
+* **enableIdempotence** - (Optional) EnableIdempotence setting for Producer, defaults to false
+* **acks** - (Optional) Acks setting for Producer, defaults to Acks.None
+* **lingerMs** - (Optional) LingerMs setting for Producer, defaults to 5
+* **batchSize** - (Optional) BatchSize setting for Producer, defaults to 1000000
+* **messageSendMaxRetries** - (Optional) MessageSendMaxRetries setting for Producer, defaults to 2147483647
+* **messageTimeoutMs** - (Optional) MessageTimeoutMs setting for Producer, defaults to 300000
+* **retryBackoffMs** - (Optional) RetryBackoffMs setting for Producer, defaults to 100
+* **securityProtocol** - (Optional) SecurityProtocol.Plaintext
+* **saslMechanism** - The SASL Mecahnism. Defaults to SaslMechanism.Plain
 * **saslUsername** - (Optional) Username for SASL. This is required for Azure Event Hubs and should be set to `$ConnectionString`
 * **saslPassword** - (Optional) Password for SASL. This is required for Azure Event Hubs and is your entire Connection String.
 * **sslCaLocation** - (Optional) Location of the SSL CA Certificates This is required for Azure Event Hubs and should be set to `./cacert.pem` as this package includes the Azure carcert.pem file which is copied into your binary output directory.
@@ -52,7 +59,11 @@ Log.Logger = new LoggerConfiguration()
           "batchSizeLimit": "50",
           "period": "5",
           "bootstrapServers": "localhost:9092",
-          "topic": "logs"
+          "topic": "logs",
+          "messageTimeoutMs": "2000",
+          "acks": "-1",
+          "lingerMs": "0",
+          "batchSize": "1"
         }
       }
     ]
@@ -61,30 +72,17 @@ Log.Logger = new LoggerConfiguration()
 
 ```
 
-## Configuration with a `topicDecider` and a custom formatter
+## Configuration with a custom formatter
 
 ```csharp
 Log.Logger = new LoggerConfiguration()
-              .WriteTo.Kafka(GetTopicName, "localhost:9092",
+              .WriteTo.Kafka("logs", "localhost:9092",
                     formatter: new CustomElasticsearchFormatter("LogEntry"));
               .CreateLogger();
 ```
 
-The code above specifies `GetTopicName` as the `topicDecider`.  Here is a sample implementation:
 
-```csharp
-private static string GetTopicName(LogEvent logEntry)
-{
-    var logInfo = logEntry.Properties["LogEntry"] as StructureValue;
-    var lookup = logInfo?.Properties.FirstOrDefault(a => a.Name == "some_property_name");
-
-    return (string.Equals(lookup, "valueForTopicA")) 
-      ? "topicA"
-      : "topicB";    
-}
-```
-
-The above code also references a `CustomElasticSearchFormatter` that uses the whole `LogEntry` as the input to the formatter.  This is a custom formatter that inherits from `ElasticsearchJsonFormatter` in the `Serilog.Sinks.Elasticsearch` NuGet package, but can be any `ITextFormatter` that you want to use when sending the log entry to Kafka.  Note that if you omit the formatter param (which is fine), the standard `JsonFormatter` will be used (with the `renderMessage` parameter set to `true`).
+The above code references a `CustomElasticSearchFormatter` that uses the whole `LogEntry` as the input to the formatter.  This is a custom formatter that inherits from `ElasticsearchJsonFormatter` in the `Serilog.Sinks.Elasticsearch` NuGet package, but can be any `ITextFormatter` that you want to use when sending the log entry to Kafka.  Note that if you omit the formatter param (which is fine), the standard `JsonFormatter` will be used (with the `renderMessage` parameter set to `true`).
 
 
 ## Configuration for Azure Event Hubs instance

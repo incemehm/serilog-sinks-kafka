@@ -1,6 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 	<PropertyGroup>
-		<Version>1.0.0</Version>
+		<Version>1.0.1</Version>
 		<GeneratePackageOnBuild>true</GeneratePackageOnBuild>
 		<TargetFramework>netstandard2.0</TargetFramework>
 		<IsPackable>true</IsPackable>
@@ -16,7 +16,7 @@
 		<PackageProjectUrl>https://github.com/incemehm/serilog-sinks-kafka/</PackageProjectUrl>
 		<PackageIcon>sink.png</PackageIcon>
 		<PackageReadmeFile>README.md</PackageReadmeFile>
-		<PackageTags>serilog;kafka;sinks</PackageTags>
+		<PackageTags>serilog;kafka;sinks;async</PackageTags>
 		<RepositoryType>git</RepositoryType>
 	</PropertyGroup>
 
