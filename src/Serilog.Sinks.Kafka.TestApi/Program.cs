@@ -24,7 +24,7 @@ builder.Host.UseSerilog((HostBuilderContext context, IServiceProvider services, 
         MessageMaxBytes = 100000000
     };
 
-    configuration.WriteTo.Kafka("log3", null, producerConfig, 50, 5, "RequestId", null, new MyJsonFormatter(renderMessage: true));
+    configuration.WriteTo.Kafka("log", producerConfig, 50, 5, "RequestId", null, new MyJsonFormatter(renderMessage: true));
 });
 
 var app = builder.Build();

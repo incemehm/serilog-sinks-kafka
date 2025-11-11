@@ -19,7 +19,6 @@ namespace Serilog.Sinks.Kafka
 
         private readonly TopicPartition _globalTopicPartition;
         private readonly ITextFormatter _formatter;
-        private readonly Func<LogEvent, string> _topicDecider;
         private readonly Action<IProducer<string, byte[]>, Error> _errorHandler;
         private readonly ProducerConfig _producerConfig;
         private readonly IProducer<string, byte[]> _producer;
@@ -33,7 +32,6 @@ namespace Serilog.Sinks.Kafka
         public KafkaSink(
             ProducerConfig producerConfig,
             string topic = null,
-            Func<LogEvent, string> topicDecider = null,
              ITextFormatter formatter = null, string messageKey = null, Action<IProducer<string, byte[]>, Error> errorHandler = null)
         {
             Console.WriteLine($"[Kafka] new topic={topic}");
@@ -42,9 +40,6 @@ namespace Serilog.Sinks.Kafka
 
             if (topic != null)
                 _globalTopicPartition = new TopicPartition(topic, Partition.Any);
-
-            if (topicDecider != null)
-                _topicDecider = topicDecider;
 
             if (_errorHandler != null)
                 _errorHandler = errorHandler;
@@ -95,8 +90,6 @@ namespace Serilog.Sinks.Kafka
 
                     Message<string, byte[]> message;
 
-                    var topicPartition = _topicDecider == null ? _globalTopicPartition : new TopicPartition(_topicDecider(logEvent), Partition.Any);
-
                     using (var render = new StringWriter(CultureInfo.InvariantCulture))
                     {
                         _formatter.Format(logEvent, render);
@@ -113,7 +106,7 @@ namespace Serilog.Sinks.Kafka
                         };
                     }
 
-                    await _actionBlock.SendAsync((topicPartition, message));
+                    await _actionBlock.SendAsync((_globalTopicPartition, message));
                 }
 
                 _producer.Flush(TimeSpan.FromSeconds(FlushTimeoutSecs));
