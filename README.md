@@ -1,6 +1,6 @@
-# serilog-sinks-kafka
+# serilog-sinks-nextkafka
 
-[![Nuget](https://img.shields.io/nuget/v/Serilog.Sinks.AsyncKafka)](https://www.nuget.org/packages/Serilog.Sinks.AsyncKafka/) [![NuGet Downloads](https://img.shields.io/nuget/dt/Serilog.Sinks.AsyncKafka.svg)](https://www.nuget.org/packages/Serilog.Sinks.AsyncKafka/)
+[![Nuget](https://img.shields.io/nuget/v/Serilog.Sinks.NextKafka)](https://www.nuget.org/packages/Serilog.Sinks.NextKafka/) [![NuGet Downloads](https://img.shields.io/nuget/dt/Serilog.Sinks.NextKafka.svg)](https://www.nuget.org/packages/Serilog.Sinks.NextKafka/)
  
 A Serilog sink that writes events to Kafka Endpoints (Including Azure Event Hubs).
 

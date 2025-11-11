@@ -1,38 +1,38 @@
 ﻿using Confluent.Kafka;
+using Microsoft.IO;
 using Serilog.Events;
 using Serilog.Formatting;
 using Serilog.Sinks.PeriodicBatching;
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using System.Threading.Tasks.Dataflow;
 
 namespace Serilog.Sinks.Kafka
 {
-    public class KafkaSink : IBatchedLogEventSink
+    public class KafkaSink : IBatchedLogEventSink, IDisposable
     {
         private const int FlushTimeoutSecs = 10;
+        const string SKIP_KEY = "skip-kafka";
 
         private readonly TopicPartition _globalTopicPartition;
         private readonly ITextFormatter _formatter;
         private readonly Action<IProducer<string, byte[]>, Error> _errorHandler;
+        private readonly Action<DeliveryReport<string, byte[]>> _deliveryHandler;
         private readonly ProducerConfig _producerConfig;
         private readonly IProducer<string, byte[]> _producer;
         private readonly string _messageKey;
 
-        private ActionBlock<(TopicPartition, Message<string, byte[]>)> _actionBlock;
-
-        const string SKIP_KEY = "skip-kafka";
-        const int IN_FLIGHT_REQUESTS = 16384;
+        private static readonly RecyclableMemoryStreamManager _streamManager = new RecyclableMemoryStreamManager();
 
         public KafkaSink(
             ProducerConfig producerConfig,
-            string topic = null,
-             ITextFormatter formatter = null, string messageKey = null, Action<IProducer<string, byte[]>, Error> errorHandler = null)
+             string topic = null,
+             ITextFormatter formatter = null, 
+             string messageKey = null, 
+             Action<IProducer<string, byte[]>, Error> errorHandler = null)
         {
             Console.WriteLine($"[Kafka] new topic={topic}");
 
@@ -51,24 +51,10 @@ namespace Serilog.Sinks.Kafka
                 };
             }
 
-            _actionBlock = new ActionBlock<(TopicPartition, Message<string, byte[]>)>(
-                async msg =>
-                {
-                    try
-                    {
-                        await _producer.ProduceAsync(msg.Item1, msg.Item2);
-                    }
-                    catch (Exception ex)
-                    {
-                        Log.ForContext(SKIP_KEY, string.Empty).Error(ex, "[Kafka][ActionBlock Error]");
-                        Log.ForContext(SKIP_KEY, string.Empty).Information($"[Kafka][batchInfo] {msg.Item2.Value}");
-                    }
-                },
-                new ExecutionDataflowBlockOptions
-                {
-                    MaxDegreeOfParallelism = IN_FLIGHT_REQUESTS,
-                    BoundedCapacity = IN_FLIGHT_REQUESTS
-                });
+            if (producerConfig.EnableDeliveryReports.GetValueOrDefault())
+                _deliveryHandler = HandleDeliveryReport;
+            else
+                _deliveryHandler = null;
 
             _messageKey = messageKey;
             _producerConfig = producerConfig;
@@ -79,7 +65,7 @@ namespace Serilog.Sinks.Kafka
 
         public Task OnEmptyBatchAsync() => Task.CompletedTask;
 
-        public async Task EmitBatchAsync(IEnumerable<LogEvent> batch)
+        public Task EmitBatchAsync(IEnumerable<LogEvent> batch)
         {
             try
             {
@@ -88,33 +74,49 @@ namespace Serilog.Sinks.Kafka
                     if (logEvent.Properties.ContainsKey(SKIP_KEY))
                         continue;
 
-                    Message<string, byte[]> message;
+                    string key = null;
+                    if (!string.IsNullOrEmpty(_messageKey) && logEvent.Properties.TryGetValue(_messageKey, out var value))
+                        key = value.ToString();
 
-                    using (var render = new StringWriter(CultureInfo.InvariantCulture))
+
+                    byte[] logBytes;
+
+                    using (var stream = _streamManager.GetStream())
                     {
-                        _formatter.Format(logEvent, render);
-
-                        string key = null;
-                        if (!string.IsNullOrEmpty(_messageKey) && logEvent.Properties.TryGetValue(_messageKey, out LogEventPropertyValue value))
-                            key = value.ToString();
-
-                        var log = Encoding.UTF8.GetBytes(render.ToString());
-                        message = new Message<string, byte[]>
+                        using (var writer = new StreamWriter(stream, Encoding.UTF8, 1024, true))
                         {
-                            Key = key,
-                            Value = log
-                        };
+                            _formatter.Format(logEvent, writer);
+                            writer.Flush();
+                        }
+
+                        logBytes = stream.ToArray();
+
                     }
 
-                    await _actionBlock.SendAsync((_globalTopicPartition, message));
-                }
+                    var message = new Message<string, byte[]>
+                    {
+                        Key = key,
+                        Value = logBytes
+                    };
 
-                _producer.Flush(TimeSpan.FromSeconds(FlushTimeoutSecs));
+                    _producer.Produce(_globalTopicPartition, message, _deliveryHandler);
+                }
             }
             catch (Exception ex)
             {
                 Log.ForContext(SKIP_KEY, string.Empty).Error(ex, "[Kafka][EmitBatchAsync Error]");
                 Log.ForContext(SKIP_KEY, string.Empty).Information($"[Kafka][batchInfo] {batch.First().RenderMessage()} ~ {batch.Last().RenderMessage()}");
+            }
+
+            return Task.CompletedTask;
+        }
+
+        private void HandleDeliveryReport(DeliveryReport<string, byte[]> report)
+        {
+            if (report.Error.IsError)
+            {
+                Log.ForContext(SKIP_KEY, string.Empty)
+                   .Error($"[Kafka] Mesaj iletilemedi. Topic: {report.Topic}, Hata: {report.Error.Reason}");
             }
         }
 
@@ -124,12 +126,34 @@ namespace Serilog.Sinks.Kafka
                     .SetErrorHandler(_errorHandler)
                     .SetLogHandler((pro, msg) =>
                     {
-                        if (msg.Level <= SyslogLevel.Error)
-                            Log.ForContext(SKIP_KEY, string.Empty).Error($"[Kafka] {msg.Level} {msg.Message}");
-                        else
-                            Log.ForContext(SKIP_KEY, string.Empty).Information($"[Kafka] {msg.Level} {msg.Message}");
+                        var level = msg.Level <= SyslogLevel.Error ? LogEventLevel.Error : LogEventLevel.Information;
+                        Log.ForContext(SKIP_KEY, string.Empty).Write(level, $"[Kafka] Producer Log: {msg.Level} | {msg.Message}");
                     })
                     .Build();
+        }
+
+        public void Dispose()
+        {
+            Console.WriteLine("[Kafka] Disposing sink. Flushing producer...");
+            try
+            {
+                var outstandingMessages = _producer.Flush(TimeSpan.FromSeconds(FlushTimeoutSecs));
+                if (outstandingMessages > 0)
+                {
+                    Log.ForContext(SKIP_KEY, string.Empty)
+                       .Warning($"[Kafka] {outstandingMessages} mesaj flush edilirken timeout oldu.");
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.ForContext(SKIP_KEY, string.Empty)
+                       .Error(ex, $"[Kafka] Producer flush edilirken hata.");
+            }
+            finally
+            {
+                _producer.Dispose();
+                Console.WriteLine("[Kafka] Sink disposed.");
+            }
         }
     }
 }

@@ -24,7 +24,7 @@ namespace Serilog.Sinks.Kafka
             int batchSizeLimit = 50,
             int period = 5,
             string bootstrapServers = "localhost:9092",
-            bool enableDeliveryReports = false,
+            bool enableDeliveryReports = true,
             bool enableIdempotence = false,
             Acks acks = Acks.None,
             double lingerMs = 5,
